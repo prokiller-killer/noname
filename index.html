@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Large File Processor</title>
+    <style>
+        /* General Reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background-color: #121212; /* Dark background */
+            color: #ffffff; /* White text */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .container {
+            max-width: 400px;
+            width: 100%;
+            background: #1e1e1e; /* Dark gray box */
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.5);
+            padding: 20px;
+        }
+
+        /* Logo with glowing effect */
+        .logo {
+            width: 100px;
+            margin-bottom: 20px;
+            filter: drop-shadow(0 0 10px #00d9ff); /* Teal glow */
+        }
+
+        h1 {
+            color: #00d9ff; /* Teal title */
+            font-size: 2rem;
+            margin-bottom: 20px;
+            cursor: pointer;
+            text-shadow: 0 0 8px #00d9ff; /* Teal glow */
+        }
+
+        label {
+            display: block;
+            margin: 10px 0 5px;
+            text-align: left;
+            color: #ccc;
+        }
+
+        input, button {
+            width: 100%;
+            margin-bottom: 15px;
+            padding: 10px;
+            font-size: 1rem;
+            border-radius: 5px;
+            border: none;
+            outline: none;
+        }
+
+        input {
+            background-color: #333;
+            color: #fff;
+        }
+
+        button {
+            background-color: #00d9ff;
+            color: #121212;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 217, 255, 0.3);
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background-color: #00b4cc;
+        }
+
+        .status {
+            margin-top: 10px;
+            font-size: 1rem;
+            color: #00ff7b; /* Green for status updates */
+        }
+
+        .footer {
+            margin-top: 20px;
+            color: #888;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Background Music -->
+<audio id="backgroundMusic" muted loop>
+    <source src="https://l.top4top.io/m_3271ijvs01.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+</audio>
+
+<div class="container">
+    <img src="https://b.top4top.io/p_327105svo0.jpg" class="logo" alt="Logo">
+    <h1 onclick="playMusic()">Welcome</h1>
+
+    <label for="comboFile">Upload Combo File (up to 1 GB):</label>
+    <input type="file" id="comboFile" accept=".txt, .csv">
+
+    <label for="siteInput">Enter Site/Domain:</label>
+    <input type="text" id="siteInput" placeholder="e.g. facebook.com">
+
+    <label for="fileNameInput">Enter Output File Name:</label>
+    <input type="text" id="fileNameInput" placeholder="e.g. my_filtered_file.txt">
+
+    <button onclick="processLargeFile()">PROCESS AND DOWNLOAD</button>
+    <div class="status" id="status"></div>
+</div>
+
+<div class="footer">
+    Created by <strong>Mr Hacky</strong>
+</div>
+
+<script>
+// Function to play background music
+function playMusic() {
+    const music = document.getElementById('backgroundMusic');
+    music.muted = false; // Unmute the audio
+    music.play(); // Start playing the audio
+}
+
+async function processLargeFile() {
+    const file = document.getElementById('comboFile').files[0];
+    const site = document.getElementById('siteInput').value;
+    const fileNameInput = document.getElementById('fileNameInput').value;
+    const status = document.getElementById('status');
+
+    if (!file) {
+        alert("Please upload a file.");
+        return;
+    }
+    if (!site) {
+        alert("Please enter a site or domain.");
+        return;
+    }
+
+    status.textContent = "Processing file...";
+
+    const filteredLines = [];
+    const CHUNK_SIZE = 1024 * 1024; // 1 MB chunks
+
+    const stream = file.stream().pipeThrough(new TextDecoderStream());
+    const reader = stream.getReader();
+    let { value: chunk, done } = await reader.read();
+    let leftover = "";
+
+    while (!done) {
+        const lines = (leftover + chunk).split("\n");
+        leftover = lines.pop(); // Save the last incomplete line
+
+        for (const line of lines) {
+            if (line.includes(site)) {
+                filteredLines.push(line);
+            }
+        }
+
+        // Read the next chunk
+        ({ value: chunk, done } = await reader.read());
+    }
+
+    // Process the final leftover line
+    if (leftover && leftover.includes(site)) {
+        filteredLines.push(leftover);
+    }
+
+    if (filteredLines.length === 0) {
+        status.textContent = "No matches found for the specified site.";
+        return;
+    }
+
+    // Sort the lines: first without '@', then with '@' in user/password
+    filteredLines.sort((a, b) => {
+        const hasAtA = a.includes('@');
+        const hasAtB = b.includes('@');
+
+        // Place lines without '@' first
+        if (hasAtA && !hasAtB) return 1;
+        if (!hasAtA && hasAtB) return -1;
+
+        return 0; // No change if both have or both don't have '@'
+    });
+
+    // Use the provided file name or default to a generated name
+    const outputFileName = fileNameInput.trim() || `filtered_${site}_combo.txt`;
+
+    // Create a downloadable Blob
+    const blob = new Blob([filteredLines.join("\n")], { type: "text/plain" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = outputFileName;
+    link.click();
+
+    status.textContent = `Processing complete! Found ${filteredLines.length} matching lines. File is ready for download.`;
+}
+</script>
+
+</body>
+</html>
